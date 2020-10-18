@@ -6,7 +6,7 @@ from dataset import ReviewDataset
 
 
 class Network:
-    def __init__(self, args, num_words, logdir):
+    def __init__(self, args, num_words, logdir, ch):
         word_ids = tf.keras.layers.Input(shape=(None,))
         layeri = tf.keras.layers.Embedding(
             num_words+1, args['we_dim'], mask_zero=True)(word_ids)
@@ -15,6 +15,9 @@ class Network:
             rnn_layer, merge_mode='concat', weights=None)(layeri)
         predictions = tf.keras.layers.Dense(1, activation='sigmoid')(layer)
         predictions_scaled = tf.math.multiply(predictions, 5)
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                         save_weights_only=True,
+                                                         verbose=1)
         self.model = tf.keras.Model(
             inputs=word_ids, outputs=predictions_scaled)
         print(self.model.summary())
@@ -60,3 +63,4 @@ for epoch in range(epochs):
     net.train_epoch(train_data, args, 100)
     metrics = net.evaluate(train_data, args, 30)
     print(f'Epoch {epoch}:{metrics}')
+    net.save_model()
