@@ -6,7 +6,7 @@ from dataset import ReviewDataset
 
 
 class Network:
-    def __init__(self, args, num_words, logdir, ch):
+    def __init__(self, args, num_words, logdir):
         word_ids = tf.keras.layers.Input(shape=(None,))
         layeri = tf.keras.layers.Embedding(
             num_words+1, args['we_dim'], mask_zero=True)(word_ids)
@@ -15,9 +15,6 @@ class Network:
             rnn_layer, merge_mode='concat', weights=None)(layeri)
         predictions = tf.keras.layers.Dense(1, activation='sigmoid')(layer)
         predictions_scaled = tf.math.multiply(predictions, 5)
-        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                         save_weights_only=True,
-                                                         verbose=1)
         self.model = tf.keras.Model(
             inputs=word_ids, outputs=predictions_scaled)
         print(self.model.summary())
@@ -48,19 +45,39 @@ class Network:
         return metrics
 
 
+class CategoricalNetwork(Network):
+    def __init__(self, args, num_words, logdir):
+        word_ids = tf.keras.layers.Input(shape=(None,))
+        layeri = tf.keras.layers.Embedding(
+            num_words+1, args['we_dim'], mask_zero=True)(word_ids)
+        rnn_layer = tf.keras.layers.LSTM(256, return_sequences=False)
+        layer = tf.keras.layers.Bidirectional(
+            rnn_layer, merge_mode='concat', weights=None)(layeri)
+        predictions = tf.keras.layers.Dense(5, activation='softmax')(layer)
+        self.model = tf.keras.Model(
+            inputs=word_ids, outputs=predictions)
+        print(self.model.summary())
+        self.model.compile(optimizer=tf.optimizers.Adam(),
+                           loss=tf.keras.losses.CategoricalCrossentropy(),
+                           metrics=[tf.keras.losses.CategoricalCrossentropy()])
+        self._writer = tf.summary.create_file_writer(
+            logdir, flush_millis=10 * 1000)
+
+
 args = {
     'batch_size': 256,
     'we_dim': 100
 }
 now = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
-LOG_DIR = os.path.join('log', f'{now}')
-epochs = 10
-train_data = ReviewDataset('train.npy', test_ratio=0.1)
+LOG_DIR = os.path.join('log', f'smoothing{now}')
+epochs = 30
+train_data = ReviewDataset('train.npy', test_ratio=0.1, label_smoothing=0.7)
 train_data.find_out_num_words()
 train_data.num_words = 40116
-net = Network(args, num_words=train_data.num_words, logdir=LOG_DIR)
+net = CategoricalNetwork(args, num_words=train_data.num_words, logdir=LOG_DIR)
 for epoch in range(epochs):
     net.train_epoch(train_data, args, 100)
     metrics = net.evaluate(train_data, args, 30)
     print(f'Epoch {epoch}:{metrics}')
-    net.save_model()
+    if epoch % 10 == 0:
+        net.model.save_weights(f'models/saved_modelSCCEsmoothing_epoch{epoch}')
