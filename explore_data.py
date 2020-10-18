@@ -1,6 +1,8 @@
-from dataset import Dataset, read_json, DATA_FILES, read_numeric_data_from_reviews
+from dataset import Dataset, read_json, DATA_FILES, read_numeric_data_from_reviews, to_one_hot
 import os
 import matplotlib.pyplot as plt
+import tensorflow as tf
+import numpy as np
 
 
 def load_business():
@@ -31,17 +33,34 @@ def load_reviews():
 
 
 def explore_reviews():
+    # Load data
     numeric_data = read_numeric_data_from_reviews(
         DATA_FILES['review'])
+    # clip useful attribute to interval 0-5
     numeric_data['useful'] = numeric_data.apply(
         lambda row: row['useful'] if row['useful'] < 5 else 5, axis=1)
-    print(numeric_data[['stars', 'useful']])
+    numeric_data = numeric_data[numeric_data['useful'] >= 0]
+
+    # Aggregate data to get pivots
     numeric_data_agg = numeric_data[['stars', 'useful']].groupby(
         ['stars', 'useful']).size().reset_index(name='Count')
 
-    # Compute means
+    # Compute means and most common features
     useful_mean = numeric_data['useful'].mean()
+    most_common_useful = np.argmax(np.bincount(numeric_data['useful']))
     stars_mean = numeric_data['stars'].mean()
+    most_common_stars = np.argmax(np.bincount(numeric_data['stars']))
+
+    # Encode to one-hot fomrat
+    useful = to_one_hot(numeric_data['useful'])
+    stars = to_one_hot(numeric_data['stars'])
+
+    # Compute sparse categorical corssentropy
+    scce = tf.keras.losses.SparseCategoricalCrossentropy()
+    useful_scce = scce(np.full((len(numeric_data)),
+                               most_common_useful), useful).numpy()
+    stars_scce = scce(np.full((len(numeric_data)),
+                              most_common_stars), stars).numpy()
 
     # Compute MSE when always predicting mean
     numeric_data['stars_se'] = numeric_data.apply(
@@ -52,8 +71,10 @@ def explore_reviews():
     useful_mse = numeric_data['useful_se'].mean()
 
     # Print results
-    print(f'Useful mean:{useful_mean}. MSE when predicting mean: {useful_mse}')
-    print(f'Stars mean:{stars_mean}. MSE when predicting mean: {stars_mse}')
+    print(
+        f'Useful mean:{useful_mean}. Baseline MSE: {useful_mse}. Baseline crossentropy: {useful_scce}')
+    print(
+        f'Stars mean:{stars_mean}. Baseline MSE: {stars_mse}. Baseline crossentropy: {stars_scce}')
     print(numeric_data_agg)
     useful_only = numeric_data[numeric_data['useful'] >= 3]
 
@@ -69,6 +90,3 @@ def explore_reviews():
     plt.xlabel('funny')
     plt.ylabel('usefull')
     plt.show()
-
-
-explore_reviews()
