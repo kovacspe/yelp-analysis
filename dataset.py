@@ -15,6 +15,24 @@ DATA_FILES = {
 }
 
 
+def to_one_hot(values):
+    values = np.array(values, dtype=np.int32)
+    n_values = np.max(values) + 1
+    return np.eye(n_values)[values]
+
+
+def smooth_labels(arr, smoothing=1):
+    arr_l = np.zeros(np.shape(arr))
+    arr_l[:, :-1] = arr[:, 1:]*(1-smoothing)/2
+    arr_l[:, 0] += arr[:, 0]*(1-smoothing)/2
+
+    arr_r = np.zeros(np.shape(arr))
+    arr_r[:, 1:] = arr[:, :-1]*(1-smoothing)/2
+    arr_r[:, -1] += arr[:, -1]*(1-smoothing)/2
+
+    return arr_l+arr*smoothing + arr_r
+
+
 def read_json(file, max_lines=None):
     list_it = []
     with open(file, 'r', encoding='utf-8') as f:
@@ -58,18 +76,24 @@ class Dataset:
 
 
 class ReviewDataset(Dataset):
-    def __init__(self, path, test_ratio):
+    def __init__(self, path, test_ratio, label_smoothing=0):
         super(ReviewDataset, self).__init__(path)
-        self.load_all(test_ratio)
+        self.load_all(test_ratio, label_smoothing)
 
-    def load_all(self, test_ratio):
+    def load_all(self, test_ratio, label_smoothing=0):
         with open(self.data_path, 'rb') as f:
             self.inp = np.load(f, allow_pickle=True)
             self.inp = tf.keras.preprocessing.sequence.pad_sequences(
                 self.inp, maxlen=128, padding='post', truncating='post'
             )
-            self.stars = np.load(f)
+            self.stars = np.load(f)-1
+            if label_smoothing:
+                self.stars = smooth_labels(
+                    to_one_hot(self.stars), label_smoothing)
             self.useful = np.load(f)
+            if label_smoothing:
+                self.useful = smooth_labels(
+                    to_one_hot(self.useful), label_smoothing)
             self.num_data = len(self.stars)
             self.train_idx = np.arange(
                 int(self.num_data*(1-test_ratio)), dtype=np.int32)
