@@ -60,4 +60,6 @@ venv.bak/
 # Custom
 .vscode
 data
+log
+*.npy
 
