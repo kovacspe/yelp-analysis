@@ -17,6 +17,8 @@ DATA_FILES = {
 
 def to_one_hot(values):
     values = np.array(values, dtype=np.int32)
+    values = np.minimum(values, 4)
+    values = np.maximum(values, 0)
     n_values = np.max(values) + 1
     return np.eye(n_values)[values]
 
