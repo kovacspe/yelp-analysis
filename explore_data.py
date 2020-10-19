@@ -35,10 +35,10 @@ def load_reviews():
 def explore_reviews():
     # Load data
     numeric_data = read_numeric_data_from_reviews(
-        DATA_FILES['review'])
+        DATA_FILES['review'], max_lines=100000)
     # clip useful attribute to interval 0-5
-    numeric_data['useful'] = numeric_data.apply(
-        lambda row: row['useful'] if row['useful'] < 5 else 5, axis=1)
+    numeric_data['useful_clipped'] = numeric_data.apply(
+        lambda row: row['useful'] if row['useful'] < 30 else 30, axis=1)
     numeric_data = numeric_data[numeric_data['useful'] >= 0]
 
     # Aggregate data to get pivots
@@ -46,7 +46,7 @@ def explore_reviews():
         ['stars', 'useful']).size().reset_index(name='Count')
 
     # Compute means and most common features
-    useful_mean = numeric_data['useful'].mean()
+    useful_mean = numeric_data['useful_clipped'].mean()
     most_common_useful = np.argmax(np.bincount(numeric_data['useful']))
     stars_mean = numeric_data['stars'].mean()
     most_common_stars = np.argmax(np.bincount(numeric_data['stars']))
@@ -60,7 +60,7 @@ def explore_reviews():
     useful_scce = scce(np.full((len(numeric_data)),
                                most_common_useful), useful).numpy()
     stars_scce = scce(np.full((len(numeric_data)),
-                              most_common_stars), stars).numpy()
+                              most_common_stars-1), stars).numpy()
 
     # Compute MSE when always predicting mean
     numeric_data['stars_se'] = numeric_data.apply(
@@ -76,17 +76,25 @@ def explore_reviews():
     print(
         f'Stars mean:{stars_mean}. Baseline MSE: {stars_mse}. Baseline crossentropy: {stars_scce}')
     print(numeric_data_agg)
-    useful_only = numeric_data[numeric_data['useful'] >= 3]
 
-    plt.title('Distribution of stars in useful reviews (useful>3)')
-    plt.hist(useful_only['stars'], bins=5)
+    useful_only = numeric_data[numeric_data['useful'] >= 30]
+    plt.title('Distribution of stars in useful reviews vs all reviews')
+    plt.hist([useful_only['stars'], numeric_data['stars']],
+             density=True, bins=5, label=['useful reviews', 'all reviews'])
+    plt.legend(loc='upper left')
     plt.show()
 
-    plt.hist2d(numeric_data['stars'], numeric_data['useful'], bins=(5, 5))
+    plt.title('Distribution of votes useful in all reviews')
+    plt.hist(numeric_data['useful'], bins=200)
+    plt.show()
+
+    numeric_data['useful_clipped'] = numeric_data.apply(
+        lambda row: row['useful'] if row['useful'] < 5 else 5, axis=1)
+    plt.hist2d(numeric_data['stars'],
+               numeric_data['useful_clipped'], bins=(5, 5))
     plt.xlabel('stars')
     plt.ylabel('usefull')
     plt.show()
-    plt.hist2d(numeric_data['funny'], numeric_data['cool'], bins=(100, 100))
-    plt.xlabel('funny')
-    plt.ylabel('usefull')
-    plt.show()
+
+
+explore_reviews()
