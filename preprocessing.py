@@ -1,18 +1,29 @@
 from nltk.stem import WordNetLemmatizer, PorterStemmer
+from nltk.tokenize import RegexpTokenizer
+from nltk.corpus import stopwords
 import nltk
 import json
 import pandas as pd
 import numpy as np
+import os
 from dataset import read_json, DATA_FILES
 
 # nltk.download('wordnet')
 # nltk.download('punkt')
+nltk.download('stopwords')
 lemmatizer = WordNetLemmatizer()
 porter = PorterStemmer()
+stop_words = set(stopwords.words('english'))
+print('the' in stop_words)
+tokenizer = RegexpTokenizer(r'\w+')
 
 
-def tokenize(sentence):
-    return nltk.word_tokenize(sentence,)
+def tokenize(sentence, drop_stop_words=False):
+    tokens = tokenizer.tokenize(sentence)
+    if drop_stop_words:
+        return [x for x in tokens if not x in stop_words]
+    else:
+        return tokens
 
 
 def lemmatize(sentence):
@@ -23,8 +34,47 @@ def stemmer(sentence):
     return [porter.stem(word) for word in sentence]
 
 
-def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0):
-    word_dict = {}
+class FreqDict(dict):
+    def insert_word(self, word):
+        if word in self:
+            self[word] += 1
+        else:
+            self[word] = 1
+
+    def to_sorted_pandas_df(self):
+        df = pd.DataFrame.from_dict(self, orient='index')
+        df.columns = ['count']
+        df.sort_values(by=['count'], ascending=False, inplace=True)
+        return df
+
+
+class SentimentDict(dict):
+    def insert_word(self, word, stars):
+        if word in self:
+            self[word].append(stars)
+        else:
+            self[word] = [stars]
+
+    def aggregate_pandas_df(self):
+        mean_std_dict = {}
+        for key, value in self.items():
+            v = np.array(value)
+            # filter rare occurences
+            if len(v) > 20:
+                mean_std_dict[key] = [np.mean(v), np.std(v), len(v)]
+        df = pd.DataFrame.from_dict(mean_std_dict, orient='index')
+        df.columns = ['mean', 'std', 'count']
+        df.sort_values(by=['std'], ascending=True, inplace=True)
+        return df
+
+
+def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop_stop_word=False):
+    word_dict = FreqDict()
+    pos_dict = FreqDict()
+    neg_dict = FreqDict()
+    sentiment = SentimentDict()
+    if not os.path.exists(output_name):
+        os.mkdir(output_name)
     # First read to get stem words and get word dictionary
     with open(file, 'r', encoding='utf-8') as f:
         with open('tmp', 'w', encoding='utf-8') as out:
@@ -32,12 +82,14 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0):
                 if i < skip_first:
                     continue
                 review = json.loads(line)
-                text = stemmer(tokenize(review['text']))
+                text = stemmer(tokenize(review['text'], drop_stop_word))
                 for word in text:
-                    if word in word_dict:
-                        word_dict[word] += 1
-                    else:
-                        word_dict[word] = 1
+                    word_dict.insert_word(word)
+                    sentiment.insert_word(word, review['stars'])
+                    if review['stars'] > 3:
+                        pos_dict.insert_word(word)
+                    elif review['stars'] < 3:
+                        neg_dict.insert_word(word)
                 print(json.dumps({
                     'text': text,
                     'stars': review['stars'],
@@ -49,17 +101,24 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0):
                     print(
                         f'Processed reviews: {100*(i-skip_first)/num_reviews:2f}%')
 
-    df = pd.DataFrame.from_dict(word_dict, orient='index')
-    df.columns = ['count']
-    df.sort_values(by=['count'], ascending=False, inplace=True)
+    # Cutoff low freqency words
+    df = word_dict.to_sorted_pandas_df()
+    sentiment.aggregate_pandas_df()
     # 1 - unknown word
     # 0 - padding
     df['id'] = np.arange(len(df)) + 2
     df = df[df['count'] > 10]
     word_dict = df['id'].to_dict()
 
+    # Save dictionaries
+    pos_dict.to_sorted_pandas_df().to_csv(os.path.join(output_name, 'pos_dict.csv'))
+    neg_dict.to_sorted_pandas_df().to_csv(os.path.join(output_name, 'neg_dict.csv'))
+    df.to_csv(os.path.join(output_name, 'word_dict.csv'))
+    sentiment.aggregate_pandas_df().to_csv(
+        os.path.join(output_name, 'sentiment.csv'))
+
+    # Inicialize np.arrays
     inp = np.zeros((num_reviews), dtype=object)
-    print(inp)
     stars = np.array(np.zeros(num_reviews))
     useful = np.array(np.zeros(num_reviews))
     with open('tmp', 'r', encoding='utf-8') as f:
@@ -73,10 +132,13 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0):
             if i % 5000 == 0:
                 print(
                     f'Processed reviews: {100*(i-skip_first)/num_reviews:2f}%')
-    with open(f'{output_name}.npy', 'wb') as f:
+    with open(os.path.join(output_name, 'data.npy'), 'wb') as f:
         np.save(f, inp)
         np.save(f, stars)
         np.save(f, useful)
 
 
-preprocess_review_dataset(DATA_FILES['review'], 'test', 100000, 1000000)
+if __name__ == "__main__":
+    # preprocess_review_dataset(DATA_FILES['review'], #'regex_tokens', 1000000)
+    preprocess_review_dataset(
+        DATA_FILES['review'], 'regex_tokens_without_stop_words', 1000000, drop_stop_word=True)
