@@ -73,11 +73,13 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
     pos_dict = FreqDict()
     neg_dict = FreqDict()
     sentiment = SentimentDict()
+
     if not os.path.exists(output_name):
         os.mkdir(output_name)
+    stemmed_data_path = os.path.join(output_name, 'stemmed_data.csv')
     # First read to get stem words and get word dictionary
     with open(file, 'r', encoding='utf-8') as f:
-        with open('tmp', 'w', encoding='utf-8') as out:
+        with open(stemmed_data_path, 'w', encoding='utf-8') as out:
             for i, line in enumerate(f):
                 if i < skip_first:
                     continue
@@ -121,7 +123,7 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
     inp = np.zeros((num_reviews), dtype=object)
     stars = np.array(np.zeros(num_reviews))
     useful = np.array(np.zeros(num_reviews))
-    with open('tmp', 'r', encoding='utf-8') as f:
+    with open(stemmed_data_path, 'r', encoding='utf-8') as f:
         for i, line in enumerate(f):
             cont = json.loads(line)
             text2num = np.array([word_dict.get(word, 1)
@@ -131,7 +133,7 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
             useful[i] = cont['useful']
             if i % 5000 == 0:
                 print(
-                    f'Processed reviews: {100*(i-skip_first)/num_reviews:2f}%')
+                    f'Processed reviews: {100*i/num_reviews:2f}%')
     with open(os.path.join(output_name, 'data.npy'), 'wb') as f:
         np.save(f, inp)
         np.save(f, stars)
@@ -140,5 +142,7 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
 
 if __name__ == "__main__":
     # preprocess_review_dataset(DATA_FILES['review'], #'regex_tokens', 1000000)
+    # preprocess_review_dataset(
+    #    DATA_FILES['review'], 'regex_tokens_without_stop_words', 1000000, drop_stop_word=True)
     preprocess_review_dataset(
-        DATA_FILES['review'], 'regex_tokens_without_stop_words', 1000000, drop_stop_word=True)
+        DATA_FILES['review'], 'test_regex_tokens_without_stop_words', 50000, skip_first=1000000, drop_stop_word=True)
