@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+from dataset import Dataset
+import os
+import sklearn.metrics as metrics
 
 
 class BayesClassifier:
@@ -29,5 +32,27 @@ class BayesClassifier:
         return pos_log_probability > neg_log_probability
 
 
-classifier = BayesClassifier(
-    'regex_tokens\\pos_dict.csv', 'regex_tokens\\neg_dict.csv', 0.5)
+if __name__ == "__main__":
+    train_pos_data_path = os.path.join(
+        'data', 'regex_tokens_without_stop_words', 'pos_dict.csv')
+    train_neg_data_path = os.path.join(
+        'data', 'regex_tokens_without_stop_words', 'neg_dict.csv')
+    test_data_path = os.path.join(
+        'data', 'test_regex_tokens_without_stop_words', 'stemmed_data.csv')
+    classifier = BayesClassifier(
+        train_pos_data_path, train_neg_data_path, 0.73679818)
+    dataset = Dataset(os.path.join(test_data_path))
+    dataset.load_all()
+
+    dataset.data = dataset.data[dataset.data['stars'] != 3]
+    dataset.data['gold'] = dataset.data.apply(
+        lambda row: row['stars'] > 3, axis=1)
+    dataset.data['predicted'] = dataset.data.apply(
+        lambda row: classifier.classify(row['text']), axis=1)
+
+    gold = dataset.data['gold']
+    predicted = dataset.data['predicted']
+    dataset.data.to_csv('predicted.csv')
+    print(f'Accuracy: {metrics.accuracy_score(gold,predicted)}')
+    print(f'F-score: {metrics.accuracy_score(gold,predicted)}')
+    print(f'Confusion matrix: {metrics.confusion_matrix(gold,predicted)}')
