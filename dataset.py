@@ -60,6 +60,14 @@ def read_numeric_data_from_reviews(file, max_lines=None):
     return pd.DataFrame(list_it)
 
 
+class ThresholdClassifier:
+    def __init__(self, threshold):
+        self.threshold = threshold
+
+    def classify(self, x):
+        return np.where(x < self.threshold, 0, 1)
+
+
 class Dataset:
     def __init__(self, path):
         self.data_path = path
@@ -78,8 +86,10 @@ class Dataset:
 
 
 class ReviewDataset(Dataset):
-    def __init__(self, path, test_ratio, label_smoothing=0):
+    def __init__(self, path, test_ratio, label_smoothing=0, output_type='stars', data_type='regression'):
         super(ReviewDataset, self).__init__(path)
+        self.output_type = output_type
+        self.data_type = data_type
         self.load_all(test_ratio, label_smoothing)
 
     def load_all(self, test_ratio, label_smoothing=0):
@@ -89,13 +99,36 @@ class ReviewDataset(Dataset):
                 self.inp, maxlen=128, padding='post', truncating='post'
             )
             self.stars = np.load(f)-1
-            if label_smoothing:
-                self.stars = smooth_labels(
-                    to_one_hot(self.stars), label_smoothing)
             self.useful = np.load(f)
-            if label_smoothing:
-                self.useful = smooth_labels(
-                    to_one_hot(self.useful), label_smoothing)
+            self.useful = np.maximum(4, np.minimum(0, self.useful))
+            if self.data_type == 'binary_classification':
+                # Filter out neutral reviews
+                ind = self.stars != 3
+                self.stars = self.stars[ind]
+                self.inp = self.inp[ind]
+                self.useful = self.useful[ind]
+
+                # Classify to binary classes
+                classifier = ThresholdClassifier(3)
+                self.stars = np.apply_along_axis(
+                    classifier.classify, 0, self.stars)
+                self.stars = to_one_hot(self.stars)
+
+                classifier = ThresholdClassifier(2)
+                self.useful = np.apply_along_axis(
+                    classifier.classify, 0, self.useful)
+                self.useful = to_one_hot(self.useful)
+
+            if self.data_type == 'classification':
+                self.stars = to_one_hot(self.stars)
+                if self.output_type == 'useful':
+                    raise AttributeError(
+                        'Multi class classification not supported for useful attribute')
+
+            if ('classification' in self.data_type) and label_smoothing:
+                self.stars = smooth_labels(self.stars, label_smoothing)
+                self.useful = smooth_labels(self.useful, label_smoothing)
+
             self.num_data = len(self.stars)
             self.train_idx = np.arange(
                 int(self.num_data*(1-test_ratio)), dtype=np.int32)
@@ -119,6 +152,9 @@ class ReviewDataset(Dataset):
         np.random.shuffle(order)
         for i in range(0, self.num_data, batch_size):
             ind = order[i:i+batch_size]
-            yield self.inp[ind], self.stars[ind], self.useful[ind]
+            if self.output_type == 'stars':
+                yield self.inp[ind], self.stars[ind]
+            else:
+                yield self.inp[ind], self.useful[ind]
             if num_batches and num_batches < i/batch_size:
                 break
