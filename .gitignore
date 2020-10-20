@@ -61,5 +61,6 @@ venv.bak/
 .vscode
 data
 log
+models
 *.npy
-
+tmp
