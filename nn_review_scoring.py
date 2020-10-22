@@ -17,9 +17,7 @@ class Network:
             # classification
             output = tf.keras.layers.Dense(5, activation='softmax')(layer)
             loss = tf.keras.losses.CategoricalCrossentropy()
-            metrics = [tf.keras.metrics.CategoricalCrossentropy(
-                name="crossentropy"),
-                tf.keras.metrics.Accuracy()]
+            metrics = ['accuracy']
         elif args['network_type'] == 'binary_classification':
             # binary classification
             output = tf.keras.layers.Dense(2, activation='softmax')(layer)
@@ -89,9 +87,10 @@ def create_and_train_network(args):
     # LOad network
     if args['load']:
         load_model = args['load']
+        net.model.load_weights(f'models/{load_model}')
+        net.train_epoch(train_data, args, 1)
         metrics = net.evaluate(train_data, args, 30)
         print(f'Loaded network: {metrics}')
-        net.model.load_weights(f'models/{load_model}')
 
     for epoch in range(args['epochs']):
         net.train_epoch(train_data, args, 100)
@@ -110,12 +109,12 @@ if __name__ == "__main__":
         'we_dim': 128,  # Number of neurons in word embedding layer
         'lstm': 256,  # Number of neurons in LSTM layer
         'lr': 0.01,  # Learning rate
-        # classificatio, binary_classification, regression
-        'network_type': 'binary_classification',
-        'name': 'useful_class',  # model name
-        'load': 'stars_reg19',  # model name to load
+        # classification, binary_classification, regression
+        'network_type': 'regression',
+        'name': 'stars_class',  # model name
+        'load': 'stars_reg-19',  # model name to load
         'label_smoothing': 0,  # Label smoothing, if 0 it wont be used
-        'output_type': 'useful',  # Predicting 'stars' or 'useful'
+        'output_type': 'stars',  # Predicting 'stars' or 'useful'
         'epochs': 0,
         # NUmber of words in dictionary, if None it will be infered automatically
         'num_words': 40116
