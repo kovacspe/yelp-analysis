@@ -16,6 +16,7 @@ DATA_FILES = {
 
 
 def to_one_hot(values):
+    # To one-hot representation of 5 classes
     values = np.array(values, dtype=np.int32)
     values = np.minimum(values, 4)
     values = np.maximum(values, 0)
@@ -24,6 +25,12 @@ def to_one_hot(values):
 
 
 def smooth_labels(arr, smoothing=1):
+    """
+    Smooths labels into neighbouring classes
+    Example(smoothing=0.8): 
+    [0,0,0,1,0]->[0,0,0.1,0.8,0.1]
+    [0,0,0,0,1]->[0,0,0,0.2,0.8]
+    """
     arr_l = np.zeros(np.shape(arr))
     arr_l[:, :-1] = arr[:, 1:]*(1-smoothing)/2
     arr_l[:, 0] += arr[:, 0]*(1-smoothing)/2
@@ -47,6 +54,9 @@ def read_json(file, max_lines=None):
 
 
 def read_numeric_data_from_reviews(file, max_lines=None):
+    """
+    Reads only numerical attributes. Fast method for non-text analysis.
+    """
     list_it = []
     with open(file, 'r', encoding='utf-8') as f:
         for i, line in enumerate(f):
@@ -61,6 +71,10 @@ def read_numeric_data_from_reviews(file, max_lines=None):
 
 
 class ThresholdClassifier:
+    """
+    Simple threshold classifier
+    """
+
     def __init__(self, threshold):
         self.threshold = threshold
 
@@ -86,6 +100,10 @@ class Dataset:
 
 
 class ReviewDataset(Dataset):
+    """
+    Specialized dateset for reviews. Includes text,stars,useful votes
+    """
+
     def __init__(self, path, test_ratio, label_smoothing=0, output_type='stars', data_type='regression'):
         super(ReviewDataset, self).__init__(path)
         self.output_type = output_type
@@ -138,6 +156,7 @@ class ReviewDataset(Dataset):
                 int(self.num_data*(1-test_ratio)), self.num_data, dtype=np.int32)
 
     def find_out_num_words(self):
+        # Returns number of words in dataset
         maximum = 0
         for x in range(self.num_data):
             m = max(self.inp[x])

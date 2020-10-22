@@ -68,11 +68,13 @@ if __name__ == "__main__":
         for t, threshold, classifier in types:
             if t == 'stars':
                 test_dataset.data = test_dataset.data[test_dataset.data[t] != 3]
+            # Classify
             test_dataset.data[f'{t}_gold'] = test_dataset.data.apply(
                 lambda row: row[t] >= threshold, axis=1)
             test_dataset.data[f'{t}_predicted'] = test_dataset.data.apply(
                 lambda row: classifier.classify(row['text']), axis=1)
 
+            # Evaluate and print results
             gold = test_dataset.data[f'{t}_gold']
             predicted = test_dataset.data[f'{t}_predicted']
             print('--------------------------------')

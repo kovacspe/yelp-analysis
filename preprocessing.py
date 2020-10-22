@@ -8,19 +8,22 @@ import numpy as np
 import os
 from dataset import read_json, DATA_FILES
 
-# nltk.download('wordnet')
-# nltk.download('punkt')
+# Download packages
+nltk.download('wordnet')
+nltk.download('punkt')
 nltk.download('stopwords')
+
+# set NLP tools
 lemmatizer = WordNetLemmatizer()
 porter = PorterStemmer()
 stop_words = set(stopwords.words('english'))
-print('the' in stop_words)
 tokenizer = RegexpTokenizer(r'\w+')
 
 
 def tokenize(sentence, drop_stop_words=False):
     tokens = tokenizer.tokenize(sentence)
     if drop_stop_words:
+        # Filter out stop words
         return [x for x in tokens if not x in stop_words]
     else:
         return tokens
@@ -35,6 +38,10 @@ def stemmer(sentence):
 
 
 class FreqDict(dict):
+    """
+    Counts word frequencies and converts do pandas df
+    """
+
     def insert_word(self, word):
         if word in self:
             self[word] += 1
@@ -49,12 +56,17 @@ class FreqDict(dict):
 
 
 class SentimentDict(dict):
+    """
+    Collects values of numerical attribute by word.
+    """
+
     def insert_word(self, word, stars):
         if word in self:
             self[word].append(stars)
         else:
             self[word] = [stars]
 
+    # Produce means, counts and stds for each word
     def aggregate_pandas_df(self):
         mean_std_dict = {}
         for key, value in self.items():
@@ -69,6 +81,7 @@ class SentimentDict(dict):
 
 
 def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop_stop_word=False):
+    # Define dictionaries
     word_dict = FreqDict()
     pos_dict = FreqDict()
     neg_dict = FreqDict()
@@ -77,18 +90,23 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
     sentiment = SentimentDict()
     usefullness = SentimentDict()
 
+    # Create output dictionary for dataset
     if not os.path.exists(output_name):
         os.mkdir(output_name)
     stemmed_data_path = os.path.join(output_name, 'stemmed_data.csv')
+
     # First read to get stem words and get word dictionary
     with open(file, 'r', encoding='utf-8') as f:
         with open(stemmed_data_path, 'w', encoding='utf-8') as out:
             for i, line in enumerate(f):
+                # Skip first skip_first reviews
                 if i < skip_first:
                     continue
                 review = json.loads(line)
+                # Preprocess review text
                 text = stemmer(tokenize(review['text'], drop_stop_word))
                 for word in text:
+                    # Add every word in dictionaries
                     word_dict.insert_word(word)
                     sentiment.insert_word(word, review['stars'])
                     usefullness.insert_word(word, review['useful'])
@@ -100,11 +118,14 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
                         useful_dict.insert_word(word)
                     elif review['useful'] < 1:
                         useless_dict.insert_word(word)
+                # Print json to file stemmed_reviews
                 print(json.dumps({
                     'text': text,
                     'stars': review['stars'],
                     'useful': review['useful']
                 }), file=out)
+
+                #   Break after num_reviews in dataset
                 if i+1 >= skip_first+num_reviews:
                     break
                 if i % 5000 == 0:
@@ -137,6 +158,7 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
     inp = np.zeros((num_reviews), dtype=object)
     stars = np.array(np.zeros(num_reviews))
     useful = np.array(np.zeros(num_reviews))
+    # Converts words to indexes
     with open(stemmed_data_path, 'r', encoding='utf-8') as f:
         for i, line in enumerate(f):
             cont = json.loads(line)
@@ -148,12 +170,14 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
             if i % 5000 == 0:
                 print(
                     f'Processed reviews: {100*i/num_reviews:2f}%')
+    # Save indexed data as npy
     with open(os.path.join(output_name, 'data.npy'), 'wb') as f:
         np.save(f, inp)
         np.save(f, stars)
         np.save(f, useful)
 
 
+# Create all preprocessed datasets
 if __name__ == "__main__":
     preprocess_review_dataset(
         DATA_FILES['review'], 'regex_tokens', 1000000)

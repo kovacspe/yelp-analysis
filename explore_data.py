@@ -6,28 +6,7 @@ import numpy as np
 import pandas as pd
 
 
-def load_business():
-    path = '.\\data'
-    business = read_json(DATA_FILES['business'])
-
-    print(f'Business columns:{business.columns}')
-    print(business['categories'])
-    business['categories'] = business.apply(
-        lambda row: row['categories'].split(', ') if row['categories'] else [], axis=1)
-    print(business['categories'].explode().value_counts())
-    x = business['categories'].explode().value_counts().iloc[0:50]
-    print(x)
-
-
-def load_users():
-    path = '.\\data'
-    user = read_json(DATA_FILES['user'], max_lines=100)
-    print(user.head())
-    print(f'Columns:{user.columns}')
-
-
 def load_reviews():
-    path = '.\\data'
     reviews = read_json(DATA_FILES['review'], max_lines=100)
     print(reviews.head())
     print(f'Columns:{reviews.columns}')
@@ -126,11 +105,14 @@ def explore_reviews():
     numeric_data['useful_class'] = numeric_data.apply(
         lambda row: classify_useful(row['useful']), axis=1)
 
+    # Get class ratios
     counts, _ = np.histogram(numeric_data['class'], bins=[1, 3, 5, 5])
     countsu, _ = np.histogram(numeric_data['useful_class'], bins=[0, 1, 3])
     print(counts/len(numeric_data))
     print('negative ratio', counts[0]/np.sum(counts[[0, 2]]))
     print('useful ratio', countsu[1]/np.sum(countsu))
+
+    # Plot stars classes distribution
     plt.title('Distribution of positive and negative reviews')
     plt.bar(['neg', 'neut', 'pos'], height=counts/len(numeric_data))
     plt.show()
@@ -162,5 +144,4 @@ if __name__ == "__main__":
         'data', 'regex_tokens_without_stop_words', 'usefullness.csv')
     explore_reviews()
     explore_usefulness(usefulness_path)
-    quit()
     explore_sentiment(sentiment_path)
