@@ -3,6 +3,7 @@ import numpy as np
 import os
 import datetime
 from dataset import ReviewDataset
+import sklearn.metrics as met
 
 
 class Network:
@@ -22,9 +23,7 @@ class Network:
             # binary classification
             output = tf.keras.layers.Dense(2, activation='softmax')(layer)
             loss = tf.keras.losses.BinaryCrossentropy()
-            metrics = [tf.keras.metrics.BinaryAccuracy(),
-                       tf.keras.metrics.Precision(),
-                       tf.keras.metrics.Recall()]
+            metrics = ['accuracy']
         elif args['network_type'] == 'regression':
             # regression
             if args['output_type'] == 'stars':
@@ -61,6 +60,11 @@ class Network:
             metrics = self.model.test_on_batch(
                 x, y, reset_metrics=False)
         self.model.reset_metrics()
+        pred = tf.argmax(self.model.predict(x), axis=1)
+        gold = tf.argmax(y, axis=1)
+        print(
+            f'precision:{met.precision_score(gold,pred)} recall{met.recall_score(gold, pred)} f1:{met.f1_score(gold,pred)}')
+
         metrics = dict(zip(self.model.metrics_names, metrics))
         with self._writer.as_default():
             for name, value in metrics.items():
@@ -110,11 +114,11 @@ if __name__ == "__main__":
         'lstm': 256,  # Number of neurons in LSTM layer
         'lr': 0.01,  # Learning rate
         # classification, binary_classification, regression
-        'network_type': 'regression',
+        'network_type': 'binary_classification',
         'name': 'stars_class',  # model name
-        'load': 'stars_reg-19',  # model name to load
+        'load': 'useful_class-19',  # model name to load
         'label_smoothing': 0,  # Label smoothing, if 0 it wont be used
-        'output_type': 'stars',  # Predicting 'stars' or 'useful'
+        'output_type': 'useful',  # Predicting 'stars' or 'useful'
         'epochs': 0,
         # NUmber of words in dictionary, if None it will be infered automatically
         'num_words': 40116
