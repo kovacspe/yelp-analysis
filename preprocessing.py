@@ -96,9 +96,9 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
                         pos_dict.insert_word(word)
                     elif review['stars'] < 3:
                         neg_dict.insert_word(word)
-                    if review['useful'] > 3:
+                    if review['useful'] >= 1:
                         useful_dict.insert_word(word)
-                    elif review['useful'] < 3:
+                    elif review['useful'] < 1:
                         useless_dict.insert_word(word)
                 print(json.dumps({
                     'text': text,
@@ -159,7 +159,7 @@ if __name__ == "__main__":
         DATA_FILES['review'], 'regex_tokens', 1000000)
     preprocess_review_dataset(
         DATA_FILES['review'], 'test_regex_tokens', 50000, skip_first=1000000)
-    quit()
+
     preprocess_review_dataset(
         DATA_FILES['review'], 'regex_tokens_without_stop_words', 1000000, drop_stop_word=True)
     preprocess_review_dataset(
