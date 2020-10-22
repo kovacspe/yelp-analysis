@@ -100,8 +100,9 @@ class ReviewDataset(Dataset):
             )
             self.stars = np.load(f)-1
             self.useful = np.load(f)
-            self.useful = np.maximum(4, np.minimum(0, self.useful))
+            self.useful = np.minimum(30, np.maximum(0, self.useful))
             if self.data_type == 'binary_classification':
+                self.useful = np.minimum(4, self.useful)
                 # Filter out neutral reviews
                 ind = self.stars != 3
                 self.stars = self.stars[ind]
@@ -120,6 +121,7 @@ class ReviewDataset(Dataset):
                 self.useful = to_one_hot(self.useful)
 
             if self.data_type == 'classification':
+                self.useful = np.minimum(4, self.useful)
                 self.stars = to_one_hot(self.stars)
                 if self.output_type == 'useful':
                     raise AttributeError(
