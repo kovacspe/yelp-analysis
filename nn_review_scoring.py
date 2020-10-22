@@ -10,7 +10,7 @@ class Network:
         word_ids = tf.keras.layers.Input(shape=(None,))
         embed = tf.keras.layers.Embedding(
             num_words+1, args['we_dim'], mask_zero=True)(word_ids)
-        rnn_layer = tf.keras.layers.LSTM(256, return_sequences=False)
+        rnn_layer = tf.keras.layers.LSTM(args['lstm'], return_sequences=False)
         layer = tf.keras.layers.Bidirectional(
             rnn_layer, merge_mode='concat', weights=None)(embed)
         if args['network_type'] == 'classification':
@@ -18,7 +18,8 @@ class Network:
             output = tf.keras.layers.Dense(5, activation='softmax')(layer)
             loss = tf.keras.losses.CategoricalCrossentropy()
             metrics = [tf.keras.metrics.CategoricalCrossentropy(
-                name="crossentropy")]
+                name="crossentropy"),
+                tf.keras.metrics.Accuracy()]
         elif args['network_type'] == 'binary_classification':
             # binary classification
             output = tf.keras.layers.Dense(2, activation='softmax')(layer)
@@ -28,9 +29,13 @@ class Network:
                        tf.keras.metrics.Recall()]
         elif args['network_type'] == 'regression':
             # regression
-            predictions = tf.keras.layers.Dense(1, activation='sigmoid')(layer)
-            output = tf.math.multiply(predictions, 4)
-            loss = tf.keras.losses.MSE()
+            if args['output_type'] == 'stars':
+                predictions = tf.keras.layers.Dense(
+                    1, activation='sigmoid')(layer)
+                output = tf.math.multiply(predictions, 4)
+            else:
+                output = tf.keras.layers.Dense(1, activation='relu')(layer)
+            loss = tf.keras.losses.MSE
             metrics = [tf.keras.metrics.MeanSquaredError(name="mse")]
         else:
             raise AttributeError('Not valid network type')
@@ -65,33 +70,56 @@ class Network:
         return metrics
 
 
-output_type = 'stars'
-epochs = 10
-args = {
-    'batch_size': 256,
-    'we_dim': 100,
-    'lr': tf.keras.optimizers.schedules.ExponentialDecay(
-        initial_learning_rate=1e-2,
-        decay_steps=10000,
-        decay_rate=0.9),
-    'network_type': 'binary_classification',
-    'name': 'network_name'
-}
+def create_and_train_network(args):
+    name = args['name']
+    now = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
+    LOG_DIR = os.path.join('log', f'{name}-{now}')
+
+    train_data = ReviewDataset(
+        'train.npy', test_ratio=0.1, label_smoothing=args['label_smoothing'], output_type=args['output_type'], data_type=args['network_type'])
+
+    if args['num_words']:
+        train_data.num_words = args['num_words']
+    else:
+        train_data.find_out_num_words()
+
+    # Define network
+    net = Network(args, num_words=train_data.num_words, logdir=LOG_DIR)
+
+    # LOad network
+    if args['load']:
+        load_model = args['load']
+        metrics = net.evaluate(train_data, args, 30)
+        print(f'Loaded network: {metrics}')
+        net.model.load_weights(f'models/{load_model}')
+
+    for epoch in range(args['epochs']):
+        net.train_epoch(train_data, args, 100)
+        metrics = net.evaluate(train_data, args, 30)
+        print(f'Epoch {epoch}:{metrics}')
+        # Save checkpoint
+        if epoch % 10 == 9:
+            net.model.save_weights(f'models/{name}-{epoch}')
+    return net
 
 
-name = args['name']
-now = datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
-LOG_DIR = os.path.join('log', f'{name}-{now}')
+if __name__ == "__main__":
+    # Set network and training params
+    args = {
+        'batch_size': 256,  # Batch size
+        'we_dim': 128,  # Number of neurons in word embedding layer
+        'lstm': 256,  # Number of neurons in LSTM layer
+        'lr': 0.01,  # Learning rate
+        # classificatio, binary_classification, regression
+        'network_type': 'binary_classification',
+        'name': 'useful_class',  # model name
+        'load': 'stars_reg19',  # model name to load
+        'label_smoothing': 0,  # Label smoothing, if 0 it wont be used
+        'output_type': 'useful',  # Predicting 'stars' or 'useful'
+        'epochs': 0,
+        # NUmber of words in dictionary, if None it will be infered automatically
+        'num_words': 40116
+    }
 
-train_data = ReviewDataset(
-    'train.npy', test_ratio=0.1, output_type=output_type, data_type=args['network_type'])
-train_data.find_out_num_words()
-train_data.num_words = 40116
-
-net = Network(args, num_words=train_data.num_words, logdir=LOG_DIR)
-for epoch in range(epochs):
-    net.train_epoch(train_data, args, 100)
-    metrics = net.evaluate(train_data, args, 30)
-    print(f'Epoch {epoch}:{metrics}')
-    if epoch % 10 == 9:
-        net.model.save_weights(f'models/{name}-{epoch}')
+    # Train
+    create_and_train_network(args)
