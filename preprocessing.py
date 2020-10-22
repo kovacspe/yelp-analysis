@@ -72,7 +72,10 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
     word_dict = FreqDict()
     pos_dict = FreqDict()
     neg_dict = FreqDict()
+    useful_dict = FreqDict()
+    useless_dict = FreqDict()
     sentiment = SentimentDict()
+    usefullness = SentimentDict()
 
     if not os.path.exists(output_name):
         os.mkdir(output_name)
@@ -88,10 +91,15 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
                 for word in text:
                     word_dict.insert_word(word)
                     sentiment.insert_word(word, review['stars'])
+                    usefullness.insert_word(word, review['useful'])
                     if review['stars'] > 3:
                         pos_dict.insert_word(word)
                     elif review['stars'] < 3:
                         neg_dict.insert_word(word)
+                    if review['useful'] > 3:
+                        useful_dict.insert_word(word)
+                    elif review['useful'] < 3:
+                        useless_dict.insert_word(word)
                 print(json.dumps({
                     'text': text,
                     'stars': review['stars'],
@@ -115,9 +123,15 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
     # Save dictionaries
     pos_dict.to_sorted_pandas_df().to_csv(os.path.join(output_name, 'pos_dict.csv'))
     neg_dict.to_sorted_pandas_df().to_csv(os.path.join(output_name, 'neg_dict.csv'))
+    useful_dict.to_sorted_pandas_df().to_csv(
+        os.path.join(output_name, 'useful_dict.csv'))
+    useless_dict.to_sorted_pandas_df().to_csv(
+        os.path.join(output_name, 'useless_dict.csv'))
     df.to_csv(os.path.join(output_name, 'word_dict.csv'))
     sentiment.aggregate_pandas_df().to_csv(
         os.path.join(output_name, 'sentiment.csv'))
+    usefullness.aggregate_pandas_df().to_csv(
+        os.path.join(output_name, 'usefullness.csv'))
 
     # Inicialize np.arrays
     inp = np.zeros((num_reviews), dtype=object)
@@ -141,8 +155,12 @@ def preprocess_review_dataset(file, output_name, num_reviews, skip_first=0, drop
 
 
 if __name__ == "__main__":
-    # preprocess_review_dataset(DATA_FILES['review'], #'regex_tokens', 1000000)
-    # preprocess_review_dataset(
-    #    DATA_FILES['review'], 'regex_tokens_without_stop_words', 1000000, drop_stop_word=True)
+    preprocess_review_dataset(
+        DATA_FILES['review'], 'regex_tokens', 1000000)
+    preprocess_review_dataset(
+        DATA_FILES['review'], 'test_regex_tokens', 50000, skip_first=1000000)
+    quit()
+    preprocess_review_dataset(
+        DATA_FILES['review'], 'regex_tokens_without_stop_words', 1000000, drop_stop_word=True)
     preprocess_review_dataset(
         DATA_FILES['review'], 'test_regex_tokens_without_stop_words', 50000, skip_first=1000000, drop_stop_word=True)
