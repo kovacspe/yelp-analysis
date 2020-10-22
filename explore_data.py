@@ -47,6 +47,20 @@ def explore_sentiment(sentiment_stats_file):
     print(neg_data.head(30))
 
 
+def explore_usefulness(stats_file):
+    data = pd.read_csv(stats_file)
+    # Filter out rare occurances
+    data = data[data['count'] > 500]
+    data = data[data['std'] < 5]
+    # Sort by std
+    data.sort_values(by=['mean'], ascending=False, inplace=True)
+    # Filter out neutral words
+    pos_data = data[data['mean'] > 0.5]
+    neg_data = data[data['mean'] < 0.5]
+    print(pos_data.head(30))
+    print(neg_data.head(30))
+
+
 def explore_reviews():
     # Load data
     numeric_data = read_numeric_data_from_reviews(
@@ -101,12 +115,22 @@ def explore_reviews():
             return 3
         else:
             return 5
+
+    def classify_useful(num_stars):
+        if num_stars < 1:
+            return 0
+        else:
+            return 2
     numeric_data['class'] = numeric_data.apply(
         lambda row: classify(row['stars']), axis=1)
+    numeric_data['useful_class'] = numeric_data.apply(
+        lambda row: classify_useful(row['useful']), axis=1)
 
     counts, _ = np.histogram(numeric_data['class'], bins=[1, 3, 5, 5])
+    countsu, _ = np.histogram(numeric_data['useful_class'], bins=[0, 1, 3])
     print(counts/len(numeric_data))
-    print(counts[[0, 2]]/np.sum(counts[[0, 2]]))
+    print('negative ratio', counts[0]/np.sum(counts[[0, 2]]))
+    print('useful ratio', countsu[1]/np.sum(countsu))
     plt.title('Distribution of positive and negative reviews')
     plt.bar(['neg', 'neut', 'pos'], height=counts/len(numeric_data))
     plt.show()
@@ -131,6 +155,12 @@ def explore_reviews():
     plt.show()
 
 
-path = os.path.join(
-    'data', 'regex_tokens_without_stop_words', 'sentiment.csv')
-explore_reviews()
+if __name__ == "__main__":
+    sentiment_path = os.path.join(
+        'data', 'regex_tokens_without_stop_words', 'sentiment.csv')
+    usefulness_path = os.path.join(
+        'data', 'regex_tokens_without_stop_words', 'usefullness.csv')
+    explore_reviews()
+    explore_usefulness(usefulness_path)
+    quit()
+    explore_sentiment(sentiment_path)
