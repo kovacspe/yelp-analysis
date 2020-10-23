@@ -147,7 +147,6 @@ class ReviewDataset(Dataset):
 
             if ('classification' in self.data_type) and label_smoothing:
                 self.stars = smooth_labels(self.stars, label_smoothing)
-                self.useful = smooth_labels(self.useful, label_smoothing)
 
             self.num_data = len(self.stars)
             self.train_idx = np.arange(
