@@ -18,11 +18,11 @@ class Network:
             # classification
             output = tf.keras.layers.Dense(5, activation='softmax')(layer)
             loss = tf.keras.losses.CategoricalCrossentropy()
-            metrics = ['accuracy']
+            metrics = [tf.keras.metrics.Accuracy()]
         elif args['network_type'] == 'binary_classification':
             # binary classification
             output = tf.keras.layers.Dense(2, activation='softmax')(layer)
-            loss = tf.keras.losses.BinaryCrossentropy()
+            loss = [tf.keras.losses.BinaryCrossentropy()]
             metrics = ['accuracy']
         elif args['network_type'] == 'regression':
             # regression
@@ -60,10 +60,11 @@ class Network:
             metrics = self.model.test_on_batch(
                 x, y, reset_metrics=False)
         self.model.reset_metrics()
-        pred = tf.argmax(self.model.predict(x), axis=1)
-        gold = tf.argmax(y, axis=1)
-        print(
-            f'precision:{met.precision_score(gold,pred)} recall{met.recall_score(gold, pred)} f1:{met.f1_score(gold,pred)}')
+        if args['binary_classification']:
+            pred = tf.argmax(self.model.predict(x), axis=1)
+            gold = tf.argmax(y, axis=1)
+            print(
+                f'precision:{met.precision_score(gold,pred)} recall{met.recall_score(gold, pred)} f1:{met.f1_score(gold,pred)}')
 
         metrics = dict(zip(self.model.metrics_names, metrics))
         with self._writer.as_default():
@@ -114,15 +115,18 @@ if __name__ == "__main__":
         'lstm': 256,  # Number of neurons in LSTM layer
         'lr': 0.01,  # Learning rate
         # classification, binary_classification, regression
-        'network_type': 'binary_classification',
-        'name': 'stars_class',  # model name
-        'load': 'useful_class-19',  # model name to load
-        'label_smoothing': 0,  # Label smoothing, if 0 it wont be used
-        'output_type': 'useful',  # Predicting 'stars' or 'useful'
-        'epochs': 0,
+        'network_type': 'classification',
+        'name': 'stars_class_new_label_smooth',  # model name
+        'load': None,  # model name to load
+        'label_smoothing': 0.8,  # Label smoothing, if 0 it wont be used
+        'output_type': 'stars',  # Predicting 'stars' or 'useful'
+        'epochs': 20,
         # NUmber of words in dictionary, if None it will be infered automatically
         'num_words': 40116
     }
 
     # Train
+    create_and_train_network(args)
+    args['label_smoothing'] = 0
+    args['name'] = 'stars_clas_new'
     create_and_train_network(args)
