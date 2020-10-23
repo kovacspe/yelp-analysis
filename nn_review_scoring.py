@@ -18,7 +18,7 @@ class Network:
             # classification
             output = tf.keras.layers.Dense(5, activation='softmax')(layer)
             loss = tf.keras.losses.CategoricalCrossentropy()
-            metrics = [tf.keras.metrics.Accuracy()]
+            metrics = ['accuracy']
         elif args['network_type'] == 'binary_classification':
             # binary classification
             output = tf.keras.layers.Dense(2, activation='softmax')(layer)
@@ -60,7 +60,7 @@ class Network:
             metrics = self.model.test_on_batch(
                 x, y, reset_metrics=False)
         self.model.reset_metrics()
-        if args['binary_classification']:
+        if args['network_type'] == 'binary_classification':
             pred = tf.argmax(self.model.predict(x), axis=1)
             gold = tf.argmax(y, axis=1)
             print(
